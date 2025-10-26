@@ -1,65 +1,115 @@
+"use client";
+
 import Image from "next/image";
+import imageInvoiceExample from "@/assets/invoice-example.jpg";
+import { BrainIcon, CameraIcon, UploadIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Webcam from "react-webcam";
+import { ReactNode, useRef, useState } from "react";
+import { Crop, PixelCrop } from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
+import { getCroppedImg } from "@/lib/react-image-crop";
+import { CameraDrawer } from "@/components/CameraDrawer";
+import { ImgCropperDrawer } from "@/components/ImgCropperDrawer";
+
+const IMAGE_CONFIG = {
+    width: 480,
+    height: 640,
+    aspectRatio: 3 / 4,
+};
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
+    const camRef = useRef<Webcam>(null);
+    const imgRef = useRef<HTMLImageElement>(null);
+
+    const [rawImg, setrawImg] = useState<string>();
+    const [croppedImg, setCroppedImg] = useState<string>();
+    const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+    const [crop, setCrop] = useState<Crop>({
+        unit: "%",
+        width: 80,
+        height: 100,
+        x: 0,
+        y: 0,
+    });
+
+    const [isOpenCamSheet, setIsOpenCamSheet] = useState(false);
+    const [isOpenCropper, setIsOpenCropper] = useState(false);
+
+    const takePhoto = () => {
+        if (camRef.current) {
+            const imgSrc = camRef.current.getScreenshot();
+
+            if (imgSrc) {
+                setrawImg(imgSrc);
+                setIsOpenCamSheet(false);
+                setIsOpenCropper(true);
+            }
+        }
+    };
+
+    const handleCropDone = async () => {
+        if (imgRef.current && completedCrop) {
+            const cropped = await getCroppedImg(imgRef.current, completedCrop);
+            setIsOpenCropper(false);
+            if (cropped) setCroppedImg(cropped);
+        }
+    };
+
+    const handleDownload = () => {
+        if (!croppedImg) return;
+        const link = document.createElement("a");
+        link.href = croppedImg;
+        link.download = "invoice-photo.jpg";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    return (
+        <div className="flex h-full flex-col items-center">
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+                width={IMAGE_CONFIG.width}
+                height={IMAGE_CONFIG.height}
+                alt="preview-image"
+                src={croppedImg ?? imageInvoiceExample}
+                className="w-[50%] object-cover"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <Button onClick={handleDownload}>Download</Button>
+
+            <div className="fixed bottom-5 flex items-center gap-10 rounded-full border border-gray-300 bg-white px-8 py-3 shadow">
+                <ToolbarButton icon={<UploadIcon />} label="Upload Image" />
+                <ToolbarButton icon={<BrainIcon />} label="Extract Data" />
+                <ToolbarButton icon={<CameraIcon />} label="Take a Photo" onClick={() => setIsOpenCamSheet(true)} />
+            </div>
+
+            <CameraDrawer
+                camRef={camRef}
+                isOpen={isOpenCamSheet}
+                setIsOpen={setIsOpenCamSheet}
+                onTakePhoto={takePhoto}
+            />
+
+            <ImgCropperDrawer
+                crop={crop}
+                imgRef={imgRef}
+                isOpen={isOpenCropper}
+                rawImg={rawImg}
+                onCropDone={handleCropDone}
+                onTakePhoto={takePhoto}
+                setCompletedCrop={setCompletedCrop}
+                setCrop={setCrop}
+                setIsOpen={setIsOpenCropper}
+            />
         </div>
-      </main>
-    </div>
-  );
+    );
 }
+
+const ToolbarButton = ({ icon, label, onClick }: { icon: ReactNode; label: string; onClick?: () => void }) => {
+    return (
+        <div className="flex cursor-pointer flex-col items-center gap-2" onClick={onClick}>
+            {icon}
+            <p className="text-xs">{label}</p>
+        </div>
+    );
+};
